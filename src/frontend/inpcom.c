@@ -138,6 +138,7 @@ static void replace_token(char *string, char *token, int where, int total);
 static void inp_add_series_resistor(struct card *deck);
 static void subckt_params_to_param(struct card *deck);
 static void inp_fix_temper_in_param(struct card *deck);
+static void inp_vdmos_model(struct card *deck);
 
 static char *inp_spawn_brace(char *s);
 
@@ -548,6 +549,8 @@ inp_readall(FILE *fp, char *dir_name, bool comfile, bool intfile, bool *expr_w_t
 
         inp_remove_excess_ws(working);
 
+        inp_vdmos_model(working);
+
         comment_out_unused_subckt_models(working);
 
         subckt_params_to_param(working);
@@ -619,29 +622,29 @@ inp_readall(FILE *fp, char *dir_name, bool comfile, bool intfile, bool *expr_w_t
         if (ft_ngdebug) {
             FILE *fd = fopen("debug-out.txt", "w");
             if (fd) {
-                /*debug: print into file*/
-                struct card *t;
-                fprintf(fd, "**************** uncommented deck **************\n\n");
-                /* always print first line */
-                fprintf(fd, "%6d  %6d  %s\n", cc->linenum_orig, cc->linenum, cc->line);
-                /* here without out-commented lines */
-                for (t = cc->nextcard; t; t = t->nextcard) {
-                    if (*(t->line) == '*')
-                        continue;
-                    fprintf(fd, "%6d  %6d  %s\n", t->linenum_orig, t->linenum, t->line);
-                }
-                fprintf(fd, "\n****************** complete deck ***************\n\n");
-                /* now completely */
-                for (t = cc; t; t = t->nextcard)
-                    fprintf(fd, "%6d  %6d  %s\n", t->linenum_orig, t->linenum, t->line);
-                fclose(fd);
-
-                fprintf(stdout, "max line length %d, max subst. per line %d, number of lines %d\n",
-                    (int)max_line_length, no_braces, dynmaxline);
+            /*debug: print into file*/
+            struct card *t;
+            fprintf(fd, "**************** uncommented deck **************\n\n");
+            /* always print first line */
+            fprintf(fd, "%6d  %6d  %s\n", cc->linenum_orig, cc->linenum, cc->line);
+            /* here without out-commented lines */
+            for (t = cc->nextcard; t; t = t->nextcard) {
+                if (*(t->line) == '*')
+                    continue;
+                fprintf(fd, "%6d  %6d  %s\n", t->linenum_orig, t->linenum, t->line);
             }
+            fprintf(fd, "\n****************** complete deck ***************\n\n");
+            /* now completely */
+            for (t = cc; t; t = t->nextcard)
+                fprintf(fd, "%6d  %6d  %s\n", t->linenum_orig, t->linenum, t->line);
+            fclose(fd);
+
+            fprintf(stdout, "max line length %d, max subst. per line %d, number of lines %d\n",
+                    (int) max_line_length, no_braces, dynmaxline);
+        }
             else
                 fprintf(stderr, "Warning: Cannot open file debug-out.txt for saving debug info\n");
-        }
+    }
     }
 
     return cc;
@@ -2433,7 +2436,7 @@ expand_section_ref(struct card *c, char *dir_name)
         /* insert the library section definition into `c' */
         {
             struct card *t = section_def;
-            for (; t; t = t->nextcard) {
+            for (; t; t=t->nextcard) {
                 c = insert_new_line(c, copy(t->line), t->linenum, t->linenum_orig);
                 if (t == section_def) {
                     c->line[0] = '*';
@@ -2705,7 +2708,7 @@ inp_fix_inst_calls_for_numparam(struct names *subckt_w_params, struct card *deck
 
                 // iterate through the deck to find the subckt (last one defined wins)
                 for (d = deck; (d = bogus_find_subckt(d, subckt_name)) != NULL; d = d->nextcard)
-                    p = d;
+                            p = d;
 
                 if (p) {
                     int num_subckt_params = inp_get_params(p->line, subckt_param_names, subckt_param_values);
@@ -2743,52 +2746,52 @@ inp_fix_inst_calls_for_numparam(struct names *subckt_w_params, struct card *deck
 
                 for (d = deck; (d = bogus_find_subckt(d, subckt_name)) != NULL; d = d->nextcard) {
                     char *subckt_line = d->line;
-                    subckt_line = skip_non_ws(subckt_line);
-                    subckt_line = skip_ws(subckt_line);
+                        subckt_line = skip_non_ws(subckt_line);
+                        subckt_line = skip_ws(subckt_line);
 
-                    int num_subckt_params = inp_get_params(subckt_line, subckt_param_names, subckt_param_values);
-                    int num_inst_params   = inp_get_params(inst_line, inst_param_names, inst_param_values);
+                            int num_subckt_params = inp_get_params(subckt_line, subckt_param_names, subckt_param_values);
+                            int num_inst_params   = inp_get_params(inst_line, inst_param_names, inst_param_values);
 
-                    // make sure that if have inst params that one matches subckt
-                    if (num_inst_params != 0) {
-                        bool found_param_match = FALSE;
-                        int j, k;
+                            // make sure that if have inst params that one matches subckt
+                            if (num_inst_params != 0) {
+                                bool found_param_match = FALSE;
+                                int j, k;
 
-                        for (j = 0; j < num_inst_params; j++) {
-                            for (k = 0; k < num_subckt_params; k++)
-                                if (strcmp(subckt_param_names[k], inst_param_names[j]) == 0) {
-                                    found_param_match = TRUE;
-                                    break;
+                                for (j = 0; j < num_inst_params; j++) {
+                                    for (k = 0; k < num_subckt_params; k++)
+                                        if (strcmp(subckt_param_names[k], inst_param_names[j]) == 0) {
+                                            found_param_match = TRUE;
+                                            break;
+                                        }
+                                    if (found_param_match)
+                                        break;
                                 }
-                            if (found_param_match)
-                                break;
-                        }
 
-                        if (!found_param_match) {
-                            // comment out .subckt and continue
-                            while (d != NULL && !ciprefix(".ends", d->line)) {
-                                *(d->line) = '*';
-                                d = d->nextcard;
+                                if (!found_param_match) {
+                                    // comment out .subckt and continue
+                                    while (d != NULL && !ciprefix(".ends", d->line)) {
+                                        *(d->line) = '*';
+                                        d = d->nextcard;
+                                    }
+                                    *(d->line) = '*';
+                                    continue;
+                                }
                             }
-                            *(d->line) = '*';
-                            continue;
+
+                            c->line = inp_fix_inst_line(inst_line, num_subckt_params, subckt_param_names, subckt_param_values, num_inst_params, inst_param_names, inst_param_values);
+                            for (i = 0; i < num_subckt_params; i++) {
+                                tfree(subckt_param_names[i]);
+                                tfree(subckt_param_values[i]);
+                            }
+
+                            for (i = 0; i < num_inst_params; i++) {
+                                tfree(inst_param_names[i]);
+                                tfree(inst_param_values[i]);
+                            }
+
+                            break;
                         }
                     }
-
-                    c->line = inp_fix_inst_line(inst_line, num_subckt_params, subckt_param_names, subckt_param_values, num_inst_params, inst_param_names, inst_param_values);
-                    for (i = 0; i < num_subckt_params; i++) {
-                        tfree(subckt_param_names[i]);
-                        tfree(subckt_param_values[i]);
-                    }
-
-                    for (i = 0; i < num_inst_params; i++) {
-                        tfree(inst_param_names[i]);
-                        tfree(inst_param_values[i]);
-                    }
-
-                    break;
-                }
-            }
 
             tfree(subckt_name);
         }
@@ -4279,79 +4282,79 @@ inp_compat(struct card *card)
                 cut_line = skip_ws(cut_line);
                 if (ciprefix("table", cut_line)) {
                     /* a regular TABLE line */
-                    cut_line += 5;
-                    // compatibility, allow table = {expr} {pairs}
-                    if (*cut_line == '=')
-                        *cut_line++ = ' ';
-                    // get the expression
-                    str_ptr =  gettok_char(&cut_line, '{', FALSE, FALSE);
-                    expression = gettok_char(&cut_line, '}', TRUE, TRUE); /* expression */
-                    if (!expression || !str_ptr) {
-                        fprintf(stderr, "Error: bad syntax in line %d\n  %s\n",
-                                card->linenum_orig, card->line);
-                        controlled_exit(EXIT_BAD);
-                    }
-                    tfree(str_ptr);
-                    /* remove '{' and '}' from expression */
-                    if ((str_ptr = strchr(expression, '{')) != NULL)
+                cut_line += 5;
+                // compatibility, allow table = {expr} {pairs}
+                if (*cut_line == '=')
+                    *cut_line++ = ' ';
+                // get the expression
+                str_ptr =  gettok_char(&cut_line, '{', FALSE, FALSE);
+                expression = gettok_char(&cut_line, '}', TRUE, TRUE); /* expression */
+                if (!expression || !str_ptr) {
+                    fprintf(stderr, "Error: bad syntax in line %d\n  %s\n",
+                            card->linenum_orig, card->line);
+                    controlled_exit(EXIT_BAD);
+                }
+                tfree(str_ptr);
+                /* remove '{' and '}' from expression */
+                if ((str_ptr = strchr(expression, '{')) != NULL)
+                    *str_ptr = ' ';
+                if ((str_ptr = strchr(expression, '}')) != NULL)
+                    *str_ptr = ' ';
+                /* cut_line may now have a '=', if yes, it will have '{' and '}'
+                   (braces around token after '=') */
+                if ((str_ptr = strchr(cut_line, '=')) != NULL)
+                    *str_ptr = ' ';
+                if ((str_ptr = strchr(cut_line, '{')) != NULL)
+                    *str_ptr = ' ';
+                if ((str_ptr = strchr(cut_line, '}')) != NULL)
+                    *str_ptr = ' ';
+                /* get first two numbers to establish extrapolation */
+                str_ptr = cut_line;
+                ffirstno = gettok_node(&cut_line);
+                if (!ffirstno) {
+                    fprintf(stderr, "Error: bad syntax in line %d\n  %s\n",
+                            card->linenum_orig, card->line);
+                    controlled_exit(EXIT_BAD);
+                }
+                firstno = copy(ffirstno);
+                fnumber = INPevaluate(&ffirstno, &nerror, TRUE);
+                secondno = gettok_node(&cut_line);
+                midline = cut_line;
+                cut_line = strrchr(str_ptr, '(');
+                if (!cut_line) {
+                    fprintf(stderr, "Error: bad syntax in line %d (missing parentheses)\n  %s\n",
+                            card->linenum_orig, card->line);
+                    controlled_exit(EXIT_BAD);
+                }
+                /* replace '(' with ',' and ')' with ' ' */
+                for (; *str_ptr; str_ptr++)
+                    if (*str_ptr == '(')
+                        *str_ptr = ',';
+                    else if (*str_ptr == ')')
                         *str_ptr = ' ';
-                    if ((str_ptr = strchr(expression, '}')) != NULL)
-                        *str_ptr = ' ';
-                    /* cut_line may now have a '=', if yes, it will have '{' and '}'
-                       (braces around token after '=') */
-                    if ((str_ptr = strchr(cut_line, '=')) != NULL)
-                        *str_ptr = ' ';
-                    if ((str_ptr = strchr(cut_line, '{')) != NULL)
-                        *str_ptr = ' ';
-                    if ((str_ptr = strchr(cut_line, '}')) != NULL)
-                        *str_ptr = ' ';
-                    /* get first two numbers to establish extrapolation */
-                    str_ptr = cut_line;
-                    ffirstno = gettok_node(&cut_line);
-                    if (!ffirstno) {
-                        fprintf(stderr, "Error: bad syntax in line %d\n  %s\n",
-                                card->linenum_orig, card->line);
-                        controlled_exit(EXIT_BAD);
-                    }
-                    firstno = copy(ffirstno);
-                    fnumber = INPevaluate(&ffirstno, &nerror, TRUE);
-                    secondno = gettok_node(&cut_line);
-                    midline = cut_line;
-                    cut_line = strrchr(str_ptr, '(');
-                    if (!cut_line) {
-                        fprintf(stderr, "Error: bad syntax in line %d (missing parentheses)\n  %s\n",
-                                card->linenum_orig, card->line);
-                        controlled_exit(EXIT_BAD);
-                    }
-                    /* replace '(' with ',' and ')' with ' ' */
-                    for (; *str_ptr; str_ptr++)
-                        if (*str_ptr == '(')
-                            *str_ptr = ',';
-                        else if (*str_ptr == ')')
-                            *str_ptr = ' ';
-                    /* scan for last two numbers */
-                    lastno = gettok_node(&cut_line);
-                    lnumber = INPevaluate(&lastno, &nerror, FALSE);
-                    /* check for max-min and take half the difference for delta */
-                    delta = (lnumber-fnumber)/2.;
-                    lastlastno = gettok_node(&cut_line);
-                    if (!secondno || (*midline == '\0') || (delta <= 0.) || !lastlastno) {
-                        fprintf(stderr, "Error: bad syntax in line %d\n  %s\n",
-                                card->linenum_orig, card->line);
-                        controlled_exit(EXIT_BAD);
-                    }
-                    ckt_array[1] = tprintf("b%s %s_int1 0 v = pwl(%s, %e, %s, %s, %s, %s, %e, %s)",
-                            title_tok, title_tok, expression, fnumber-delta, secondno, firstno, secondno,
-                            midline, lnumber + delta, lastlastno);
+                /* scan for last two numbers */
+                lastno = gettok_node(&cut_line);
+                lnumber = INPevaluate(&lastno, &nerror, FALSE);
+                /* check for max-min and take half the difference for delta */
+                delta = (lnumber-fnumber)/2.;
+                lastlastno = gettok_node(&cut_line);
+                if (!secondno || (*midline == '\0') || (delta <= 0.) || !lastlastno) {
+                    fprintf(stderr, "Error: bad syntax in line %d\n  %s\n",
+                            card->linenum_orig, card->line);
+                    controlled_exit(EXIT_BAD);
+                }
+                ckt_array[1] = tprintf("b%s %s_int1 0 v = pwl(%s, %e, %s, %s, %s, %s, %e, %s)",
+                        title_tok, title_tok, expression, fnumber-delta, secondno, firstno, secondno,
+                        midline, lnumber + delta, lastlastno);
 
-                    // comment out current variable e line
-                    *(card->line) = '*';
-                    // insert new B source line immediately after current line
-                    for (i = 0; i < 2; i++)
-                        card = insert_new_line(card, ckt_array[i], 0, 0);
+                // comment out current variable e line
+                *(card->line) = '*';
+                // insert new B source line immediately after current line
+                for (i = 0; i < 2; i++)
+                    card = insert_new_line(card, ckt_array[i], 0, 0);
 
-                    tfree(firstno);
-                    tfree(lastlastno);
+                tfree(firstno);
+                tfree(lastlastno);
 
                 }
                 else {
@@ -5200,9 +5203,8 @@ replace_token(char *string, char *token, int wherereplace, int total)
 }
 
 
-/* lines for B sources (except for pwl lines): no parsing in numparam code,
-   just replacement of parameters. pwl lines are still handled in numparam.
-   Parsing for all other B source lines are done in the B source parser.
+/* lines for B sources: no parsing in numparam code, just replacement of parameters.
+   Parsing done in B source parser.
    To achive this, do the following:
    Remove all '{' and '}' --> no parsing of equations in numparam
    Place '{' and '}' directly around all potential parameters,
@@ -5210,6 +5212,7 @@ replace_token(char *string, char *token, int wherereplace, int total)
    functions containing nodes like v(node), v(node1, node2), i(branch)
    and other keywords like TEMPER. --> Only parameter replacement in numparam
 */
+
 
 static void
 inp_bsource_compat(struct card *card)
@@ -5236,7 +5239,7 @@ inp_bsource_compat(struct card *card)
             /* remove white spaces of everything inside {}*/
             card->line = inp_remove_ws(card->line);
             curr_line = card->line;
-            /* exclude special pwl lines */
+            /* store starting point for later parsing, beginning of {expression} */
             if (strstr(curr_line, "=pwl("))
                 continue;
             /* store starting point for later parsing, beginning of {expression} */
@@ -6082,6 +6085,60 @@ inp_quote_params(struct card *c, struct card *end_c, struct dependency *deps, in
                     s += strlen(deps[i].param_name);
                 }
             }
+        }
+    }
+}
+
+
+/* VDMOS special:
+   Check for 'vdmos' in .model line.
+   check if 'pchan', then add p to vdmos and ignore 'pchan'.
+   If no 'pchan' is found, add n to vdmos.
+   Ignore annotations on Vds, Ron, Qg, and mfg.
+   Assemble all other tokens in a wordlist, and flatten it
+   to become the new .model line.
+*/
+
+static void
+inp_vdmos_model(struct card *deck)
+{
+    struct card *card;
+    for (card = deck; card; card = card->nextcard) {
+
+        char *curr_line, *cut_line, *token, *new_line;
+        wordlist *wl = NULL, *wlb;
+
+        curr_line = cut_line = card->line;
+
+        if (ciprefix(".model", curr_line) && strstr(curr_line, "vdmos")) {
+            cut_line = strstr(curr_line, "vdmos");
+            wl_append_word(&wl, &wl, copy_substring(curr_line, cut_line));
+            wlb = wl;
+            if (strstr(cut_line, "pchan")) {
+                wl_append_word(NULL, &wl, "vdmosp (");
+            }
+            else {
+                wl_append_word(NULL, &wl, "vdmosn (");
+            }
+            cut_line = cut_line + 5;
+
+            cut_line = skip_ws(cut_line);
+            if (*cut_line == '(')
+                cut_line = cut_line + 1;
+            new_line = NULL;
+            while (cut_line && *cut_line) {
+                token = gettok_noparens(&cut_line);
+                if (!ciprefix("pchan", token) && !ciprefix("ron=", token) && !ciprefix("vds=", token) &&
+                        !ciprefix("qg=", token) && !ciprefix("mfg=", token) && !ciprefix("nchan", token))
+                    wl_append_word(NULL, &wl, token);
+                if (*cut_line == ')') {
+                    wl_append_word(NULL, &wl, ")");
+                    break;
+                }
+            }
+            new_line = wl_flatten(wlb);
+            tfree(card->line);
+            card->line = new_line;
         }
     }
 }
