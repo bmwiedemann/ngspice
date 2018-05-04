@@ -232,7 +232,6 @@ enum {
     MUT_QUEST_SENS_DC,
 };
 
-
 #include "indext.h"
 
 #endif /*IND*/

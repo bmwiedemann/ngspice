@@ -27,8 +27,6 @@ enum {
     VDMOSNSRCS
 };
 
-     /* the number of VDMOSFET noise sources*/
-
 /* information needed for each instance */
 
 typedef struct sVDMOSinstance {

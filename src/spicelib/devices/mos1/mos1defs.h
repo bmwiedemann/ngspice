@@ -27,8 +27,6 @@ enum {
     MOS1NSRCS
 };
 
-     /* the number of MOS1FET noise sources*/
-
 /* information needed for each instance */
 
 typedef struct sMOS1instance {
