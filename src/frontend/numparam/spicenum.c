@@ -382,9 +382,12 @@ nupa_done(void)
 
 /* SJB - Scan the line for subcircuits */
 void
-nupa_scan(struct card *card)
+nupa_scan(struct card *card, int is_subckt)
 {
-    defsubckt(dicoS, card);
+    if (is_subckt)
+        defsubckt(dicoS, card, NUPA_SUBCKT);
+    else
+        defsubckt(dicoS, card, NUPA_MODEL);
 }
 
 

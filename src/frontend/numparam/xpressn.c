@@ -472,7 +472,7 @@ nupa_define(dico_t *dico,
 
     c = entry->tp;
 
-    if (c != NUPA_SUBCKT) {
+    if ((c == NUPA_REAL) || (c == NUPA_STRING) || (c == NUPA_UNKNOWN)) {
 
         entry->vl = z;
         entry->tp = tpe;
@@ -487,9 +487,13 @@ nupa_define(dico_t *dico,
             warn = message(dico, "%s:%d overwritten.\n", t, entry->level);
 
     } else {
-        /* error message for redefinition of subcircuits */
+        /* suppress error message, resulting from multiple definition of
+           symbols (devices) in .model lines with same name, but in different subcircuits.
+           Subcircuit expansion is o.k., we have to deal with this numparam
+           behaviour later. (H. Vogt 090426)
+        */
         if (0)
-            message(dico, "subckt %s is already used,\n cannot be redefined\n", t);
+            message(dico, "%s: cannot redefine\n", t);
     }
 
     return 0;
@@ -497,9 +501,9 @@ nupa_define(dico_t *dico,
 
 
 bool
-defsubckt(dico_t *dico, struct card *card)
+defsubckt(dico_t *dico, struct card *card, nupa_type categ)
 /* called on 1st pass of spice source code,
-   to enter subcircuit names
+   to enter subcircuit (categ=U) and model (categ=O) names
 */
 {
     const char *s = card->line;
@@ -527,7 +531,7 @@ defsubckt(dico_t *dico, struct card *card)
         SPICE_DSTRING ustr;     /* temp user string */
         spice_dstring_init(&ustr);
         pscopy(&ustr, s, s_end);
-        err = nupa_define(dico, spice_dstring_value(&ustr), ' ', NUPA_SUBCKT, 0.0, w, NULL);
+        err = nupa_define(dico, spice_dstring_value(&ustr), ' ', categ, 0.0, w, NULL);
         spice_dstring_free(&ustr);
     } else {
         err = message(dico, "Subcircuit or Model without name.\n");
@@ -1585,3 +1589,4 @@ const struct nupa_type S_nupa_real = { "NUPA_REAL" };
 const struct nupa_type S_nupa_string = { "NUPA_STRING" };
 const struct nupa_type S_nupa_subckt = { "NUPA_SUBCKT" };
 const struct nupa_type S_nupa_unknown = { "NUPA_UNKNOWN" };
+const struct nupa_type S_nupa_model = { "NUPA_MODEL" };
