@@ -743,7 +743,7 @@ bot:
     is_initialized = TRUE;
 
     if(!myvec)
-        myvec = TMALLOC(vector_info, sizeof(vector_info));
+        myvec = TMALLOC(vector_info, 1);
 
 #if !defined(low_latency)
     /* If caller has sent valid address for pfcn */
