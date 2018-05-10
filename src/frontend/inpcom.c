@@ -6769,7 +6769,6 @@ pspice_compat(struct card *oldcard)
                     if (ciprefix(".ends", modcard->line))
                         break;
                     if (ciprefix(".model", modcard->line) && strstr(modcard->line, stoks[5]) && strstr(modcard->line, "vswitch")) {
-                        char *delstr;
                         char *modpar[4];
                         modcard->line = str = inp_remove_ws(modcard->line);
                         str = nexttok(str); /* throw away '.model' */
