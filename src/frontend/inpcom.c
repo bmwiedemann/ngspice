@@ -6399,8 +6399,10 @@ find_model(struct card *startcard, struct card *changecard, char *searchname, ch
                 /* we have got it */
                 char *newmodcard = tprintf(".model %s %s %s%s", newmname, newmtype, origmodline, endstr);
                 char *tmpstr = strstr(newmodcard, ")(");
-                tmpstr[0] = ' ';
-                tmpstr[1] = ' ';
+                if (tmpstr) {
+                    tmpstr[0] = ' ';
+                    tmpstr[1] = ' ';
+                }
                 tfree(changecard->line);
                 changecard->line = newmodcard;
                 tfree(origmname);
@@ -6769,7 +6771,7 @@ pspice_compat(struct card *oldcard)
                     if (ciprefix(".model", modcard->line) && strstr(modcard->line, stoks[5]) && strstr(modcard->line, "vswitch")) {
                         char *delstr;
                         char *modpar[4];
-                        delstr = str = inp_remove_ws(modcard->line);
+                        modcard->line = str = inp_remove_ws(modcard->line);
                         str = nexttok(str); /* throw away '.model' */
                         str = nexttok(str); /* throw away 'modname' */
                         if (!ciprefix("vswitch", str))
@@ -6783,8 +6785,17 @@ pspice_compat(struct card *oldcard)
                         /* we have to find 4 parameters, identified by '=', separated by spaces */
                         char *equalptr[4];
                         equalptr[0] = strstr(str, "=");
-                        for (i = 1; i < 4; i++)
-                            equalptr[i] = strstr(equalptr[i-1] + 1, "=");
+                        if (!equalptr[0]) {
+                            fprintf(stderr, "Error: not enough parameters in vswitch model\n   %s\n", modcard->line);
+                            controlled_exit(1);
+                        }
+                        for (i = 1; i < 4; i++) {
+                            equalptr[i] = strstr(equalptr[i - 1] + 1, "=");
+                            if (!equalptr[i]) {
+                                fprintf(stderr, "Error: not enough parameters in vswitch model\n   %s\n", modcard->line);
+                                controlled_exit(1);
+                            }
+                        }
                         for (i = 0; i < 4; i++) {
                             equalptr[i] = skip_back_ws(equalptr[i], str);
                             equalptr[i] = skip_back_non_ws(equalptr[i], str);
@@ -6796,7 +6807,7 @@ pspice_compat(struct card *oldcard)
                         else
                             /* vswitch defined without parens */
                             modpar[3] = copy(equalptr[3]);
-                        tfree(delstr);
+                        tfree(modcard->line);
                         /* .model is now in modcard, tokens in modpar, call to s in card, tokens in stoks */
                         /* rewrite .model line (modcard->li_line already freed in inp_remove_ws())
                         Replace VON by cntl_on, VOFF by cntl_off, RON by r_on, and ROFF by r_off */
@@ -6835,8 +6846,17 @@ pspice_compat(struct card *oldcard)
                         /* we have to find 4 parameters, identified by '=', separated by spaces */
                         char *equalptr[4];
                         equalptr[0] = strstr(str, "=");
-                        for (i = 1; i < 4; i++)
+                        if (!equalptr[0]) {
+                            fprintf(stderr, "Error: not enough parameters in vswitch model\n   %s\n", modcard->line);
+                            controlled_exit(1);
+                        }
+                        for (i = 1; i < 4; i++) {
                             equalptr[i] = strstr(equalptr[i - 1] + 1, "=");
+                            if (!equalptr[i]) {
+                                fprintf(stderr, "Error: not enough parameters in vswitch model\n   %s\n", modcard->line);
+                                controlled_exit(1);
+                            }
+                        }
                         for (i = 0; i < 4; i++) {
                             equalptr[i] = skip_back_ws(equalptr[i], str);
                             equalptr[i] = skip_back_non_ws(equalptr[i], str);
@@ -6845,7 +6865,7 @@ pspice_compat(struct card *oldcard)
                             modpar[i] = copy_substring(equalptr[i], equalptr[i + 1] - 1);
                         modpar[3] = copy_substring(equalptr[3], strrchr(equalptr[3], ')'));
 
-                        tfree(delstr);
+                        tfree(modcard->line);
                         /* .model is now in modcard, tokens in modpar, call to s in card, tokens in stoks */
                         /* rewrite .model line (already freed in inp_remove_ws())
                         Replace VON by cntl_on, VOFF by cntl_off, RON by r_on, and ROFF by r_off */
