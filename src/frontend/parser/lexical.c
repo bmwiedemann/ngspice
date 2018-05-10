@@ -200,6 +200,7 @@ nloop:
 
         /* '#' or '*' as the first character in a line,
            starts a comment line, drop it */
+
         if ((c == '#' || c == '*') && (linebuf.i == 1)) {
             if (string) {
                 wl_free(wlist);
