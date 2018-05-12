@@ -332,9 +332,6 @@ nupa_del_dicoS(void)
     if(!dicoS)
         return;
 
-    for (i = dynmaxline; i >= 0; i--)
-        txfree(dicoS->dynrefptr[i]);
-
     txfree(dicoS->dynrefptr);
     txfree(dicoS->dyncategory);
     txfree(dicoS->inst_name);
