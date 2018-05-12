@@ -303,7 +303,8 @@ static void
 nupa_init(void)
 {
     int i;
-
+    /* clear the old dicos, if any */
+    nupa_del_dicoS();
     /* init the symbol table and so on, before the first  nupa_copy. */
     evalcountS = 0;
     linecountS = 0;
